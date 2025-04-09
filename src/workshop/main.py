@@ -73,7 +73,7 @@ async def add_agent_tools():
     toolset.add(file_search_tool)
 
 
-async def initialize() -> tuple[Agent | None, AgentThread | None]:
+async def initialize() -> tuple[Agent, AgentThread]:
     """Initialize the agent with the sales data schema and instructions."""
 
     await add_agent_tools()
@@ -88,6 +88,7 @@ async def initialize() -> tuple[Agent | None, AgentThread | None]:
         with open(INSTRUCTIONS_FILE_PATH, "r", encoding="utf-8", errors="ignore") as file:
             instructions = file.read()
 
+        # Replace the placeholder with the database schema string
         instructions = instructions.replace("{database_schema_string}", database_schema_string)
         instructions = instructions.replace("{current_date}", date.today().strftime("%Y-%m-%d"))
 
@@ -111,7 +112,6 @@ async def initialize() -> tuple[Agent | None, AgentThread | None]:
     except Exception as e:
         logger.error("An error occurred initializing the agent: %s", str(e))
         logger.error("Please ensure you've enabled an instructions file.")
-        return None, None  # <-- important fix
 
 
 async def cleanup(agent: Agent, thread: AgentThread) -> None:
@@ -148,16 +148,14 @@ async def post_message(thread_id: str, content: str, agent: Agent, thread: Agent
 
 
 async def main() -> None:
-    print("Starting async program...")
-
+    """
+    Main function to run the agent.
+    Example questions: Sales by region, top-selling products, total shipping costs by region, show as a pie chart.
+    """
     agent, thread = await initialize()
 
-    # ⛔ Exit early if agent or thread couldn't be created
-    if agent is None or thread is None:
-        print("❌ Agent initialization failed. Please check your connection or configuration.")
-        return
-
     while True:
+        # Get user input prompt in the terminal using a pretty shade of green
         print("\n")
         prompt = input(f"{tc.GREEN}Enter your query (type exit to finish): {tc.RESET}")
         if prompt.lower() == "exit":
@@ -167,7 +165,6 @@ async def main() -> None:
         await post_message(agent=agent, thread_id=thread.id, content=prompt, thread=thread)
 
     await cleanup(agent, thread)
-
 
 
 if __name__ == "__main__":
