@@ -48,32 +48,32 @@ functions = AsyncFunctionTool(
     }
 )
 
-# INSTRUCTIONS_FILE = "instructions/instructions_function_calling.txt"
-# INSTRUCTIONS_FILE = "instructions/instructions_code_interpreter.txt"
-# INSTRUCTIONS_FILE = "instructions/instructions_file_search.txt"
+INSTRUCTIONS_FILE = "instructions/instructions_function_calling.txt"
+INSTRUCTIONS_FILE = "instructions/instructions_code_interpreter.txt"
+INSTRUCTIONS_FILE = "instructions/instructions_file_search.txt"
 
 
 async def add_agent_tools():
     """Add tools for the agent."""
 
     # Add the functions tool
-    # toolset.add(functions)
+    toolset.add(functions)
 
     # Add the code interpreter tool
-    # code_interpreter = CodeInterpreterTool()
-    # toolset.add(code_interpreter)
+    code_interpreter = CodeInterpreterTool()
+    toolset.add(code_interpreter)
 
     # Add the tents data sheet to a new vector data store
-    # vector_store = await utilities.create_vector_store(
-    #     project_client,
-    #     files=[TENTS_DATA_SHEET_FILE],
-    #     vector_name_name="Contoso Product Information Vector Store",
-    # )
-    # file_search_tool = FileSearchTool(vector_store_ids=[vector_store.id])
-    # toolset.add(file_search_tool)
+    vector_store = await utilities.create_vector_store(
+        project_client,
+        files=[TENTS_DATA_SHEET_FILE],
+        vector_name_name="Contoso Product Information Vector Store",
+    )
+    file_search_tool = FileSearchTool(vector_store_ids=[vector_store.id])
+    toolset.add(file_search_tool)
 
 
-async def initialize() -> tuple[Agent, AgentThread]:
+async def initialize() -> tuple[Agent | None, AgentThread | None]:
     """Initialize the agent with the sales data schema and instructions."""
 
     await add_agent_tools()
@@ -88,7 +88,6 @@ async def initialize() -> tuple[Agent, AgentThread]:
         with open(INSTRUCTIONS_FILE_PATH, "r", encoding="utf-8", errors="ignore") as file:
             instructions = file.read()
 
-        # Replace the placeholder with the database schema string
         instructions = instructions.replace("{database_schema_string}", database_schema_string)
         instructions = instructions.replace("{current_date}", date.today().strftime("%Y-%m-%d"))
 
@@ -112,6 +111,7 @@ async def initialize() -> tuple[Agent, AgentThread]:
     except Exception as e:
         logger.error("An error occurred initializing the agent: %s", str(e))
         logger.error("Please ensure you've enabled an instructions file.")
+        return None, None  # <-- important fix
 
 
 async def cleanup(agent: Agent, thread: AgentThread) -> None:
@@ -148,14 +148,16 @@ async def post_message(thread_id: str, content: str, agent: Agent, thread: Agent
 
 
 async def main() -> None:
-    """
-    Main function to run the agent.
-    Example questions: Sales by region, top-selling products, total shipping costs by region, show as a pie chart.
-    """
+    print("Starting async program...")
+
     agent, thread = await initialize()
 
+    # ⛔ Exit early if agent or thread couldn't be created
+    if agent is None or thread is None:
+        print("❌ Agent initialization failed. Please check your connection or configuration.")
+        return
+
     while True:
-        # Get user input prompt in the terminal using a pretty shade of green
         print("\n")
         prompt = input(f"{tc.GREEN}Enter your query (type exit to finish): {tc.RESET}")
         if prompt.lower() == "exit":
@@ -165,6 +167,7 @@ async def main() -> None:
         await post_message(agent=agent, thread_id=thread.id, content=prompt, thread=thread)
 
     await cleanup(agent, thread)
+
 
 
 if __name__ == "__main__":
